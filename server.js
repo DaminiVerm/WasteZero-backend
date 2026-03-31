@@ -7,13 +7,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import pickupRoutes from "./routes/pickupRoutes.js";
 import { Server } from "socket.io";
-import Message from "./model/messages.js";
 import http from "http";
 import userRoutes from "./routes/userRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoute.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
-import Notification from "./model/notification.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import {
   addConnectedUser,
@@ -22,8 +20,6 @@ import {
   removeConnectedUserBySocket,
   setSocketInstance,
 } from "./utils/socket.js";
-
-import { getDashboardData } from "./controller/dashboardController.js";
 
 dotenv.config();
 connectDB();
@@ -51,49 +47,46 @@ app.get("/api/test", (req, res) => {
   res.send("Backend is working!");
 });
 
-const io = new Server(server, {
-  cors: {
-    origin: ["https://wastezero-smart-waste-platform-frontend.onrender.com"],
-    methods: ["GET", "POST"],
-  },
-});
-setSocketInstance(io);
-
-io.on("connection", (socket) => {
-  console.log("User Connected:", socket.id);
-
-  socket.on("addUser", (userId) => {
-    addConnectedUser(userId, socket.id);
+// Vercel serverless functions should export the Express app directly.
+// Socket.io is only initialized for local long-running Node servers.
+if (!process.env.VERCEL) {
+  const io = new Server(server, {
+    cors: {
+      origin: ["https://wastezero-smart-waste-platform-frontend.onrender.com"],
+      methods: ["GET", "POST"],
+    },
   });
+  setSocketInstance(io);
 
-  socket.on("sendMessage", async ({ senderId, receiverId, text }) => {
-    try {
-      const isSelfMessage =
-        senderId?.toString() === receiverId?.toString();
+  io.on("connection", (socket) => {
+    console.log("User Connected:", socket.id);
 
-      if (!isSelfMessage) {
-        await Notification.create({
-          recipient: receiverId,
-          sender: senderId,
-          type: "message",
-          content: `New message: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`,
-          link: "/messages",
-        });
+    socket.on("addUser", (userId) => {
+      addConnectedUser(userId, socket.id);
+    });
+
+    socket.on("sendMessage", async ({ senderId, receiverId, text }) => {
+      try {
+        emitMessageToUser(receiverId, { senderId, receiverId, text });
+
+        if (senderId?.toString() !== receiverId?.toString()) {
+          emitNotificationToUser(receiverId);
+        }
+      } catch (error) {
+        console.log("Socket message error:", error);
       }
+    });
 
-      emitMessageToUser(receiverId, { senderId, receiverId, text });
-      if (!isSelfMessage) {
-        emitNotificationToUser(receiverId);
-      }
-    } catch (error) {
-      console.log("Socket message error:", error);
-    }
+    socket.on("disconnect", () => {
+      removeConnectedUserBySocket(socket.id);
+      console.log("User disconnected");
+    });
   });
 
-  socket.on("disconnect", () => {
-    removeConnectedUserBySocket(socket.id);
-    console.log("User disconnected");
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
   });
-});
+}
 
 export default app;
