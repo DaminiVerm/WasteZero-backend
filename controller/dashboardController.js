@@ -613,6 +613,17 @@ export const sendMessage = async (req, res) => {
       text,
     });
 
+    if (senderId.toString() !== receiverId.toString()) {
+      await Notification.create({
+        recipient: receiverId,
+        sender: senderId,
+        type: "message",
+        content: `${req.user.name} sent you a new message.`,
+        link: "/messages",
+      });
+      emitNotificationToUser(receiverId);
+    }
+
     res.status(201).json(newMessage);
   } catch (error) {
     console.error("sendMessage Error:", error);
