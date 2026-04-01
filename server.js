@@ -37,6 +37,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/auth", userRoutes); // auth routes: /login, /register, /verify-otp
+app.use("/api/users", userRoutes);
 app.use("/api/opportunity", opportunityRoutes);
 app.use("/api/pickups", pickupRoutes);
 app.use("/api/messages", messageRoutes);

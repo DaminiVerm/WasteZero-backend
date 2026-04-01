@@ -9,9 +9,30 @@ import mongoose from "mongoose";
 const mockUsers = [];
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
+const isProductionLike = () =>
+  process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+
+const ensureAuthStorageAvailable = (res) => {
+  if (isDbConnected()) {
+    return true;
+  }
+
+  if (isProductionLike()) {
+    res.status(503).json({
+      message: "Database connection is unavailable. Please check server configuration.",
+    });
+    return false;
+  }
+
+  return true;
+};
 
 export const registerUser = async (req, res) => { 
   try {
+    if (!ensureAuthStorageAvailable(res)) {
+      return;
+    }
+
     const { name, email, username, password, role } = req.body;
 
     // Check required fields
@@ -84,6 +105,10 @@ export const registerUser = async (req, res) => {
 
 export const verifyRegisterOtp = async (req, res) => { 
    try {
+    if (!ensureAuthStorageAvailable(res)) {
+      return;
+    }
+
     const { userId, otp } = req.body;
 
     const user = isDbConnected() 
@@ -124,6 +149,10 @@ export const verifyRegisterOtp = async (req, res) => {
 
 export const loginUser = async (req, res) => { 
   try {
+    if (!ensureAuthStorageAvailable(res)) {
+      return;
+    }
+
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -182,6 +211,10 @@ export const loginUser = async (req, res) => {
 
 export const verifyLoginOtp = async (req, res) => { 
   try {
+    if (!ensureAuthStorageAvailable(res)) {
+      return;
+    }
+
     const { userId, otp } = req.body;
 
     const user = isDbConnected()
@@ -239,6 +272,10 @@ if (user.isSuspended) {
 
 export const resendOtp = async (req, res) => {
   try {
+    if (!ensureAuthStorageAvailable(res)) {
+      return;
+    }
+
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ message: "User ID is required" });
 
