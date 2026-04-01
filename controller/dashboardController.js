@@ -247,6 +247,17 @@ const buildMaterialBreakdown = (values = []) => {
     });
 };
 
+const resolveUploadedImageUrl = (file) => {
+  if (!file) return null;
+
+  return (
+    file.path ||
+    file.secure_url ||
+    file.url ||
+    (file.filename ? `/uploads/${file.filename}` : null)
+  );
+};
+
 
 export const ngoDashboard = async (req, res) => {
   try {
@@ -326,8 +337,17 @@ export const createOpportunity = async (req, res) => {
     console.log("REQ.BODY:", req.body);
     console.log("REQ.FILE:", req.file);
 
-    const { title, description, location, date, duration, status } = req.body;
-    const image = req.file ? req.file.path : null;
+    const {
+      title,
+      description,
+      location,
+      date,
+      duration,
+      status,
+      wasteType,
+      requiredSkills,
+    } = req.body;
+    const image = resolveUploadedImageUrl(req.file);
 
 
     if (!req.user) {
@@ -342,6 +362,13 @@ export const createOpportunity = async (req, res) => {
       duration,
       status: status || "Open",
       image,
+      wasteType,
+      requiredSkills: Array.isArray(requiredSkills)
+        ? requiredSkills
+        : (requiredSkills || "")
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean),
       createdBy: req.user._id
     });
 
@@ -396,11 +423,18 @@ export const updateOpportunity = async (req, res) => {
       date: req.body.date,
       duration: req.body.duration,
       status: req.body.status,
+      wasteType: req.body.wasteType,
+      requiredSkills: Array.isArray(req.body.requiredSkills)
+        ? req.body.requiredSkills
+        : (req.body.requiredSkills || "")
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean),
     };
 
     // If image uploaded
     if (req.file) {
-      updatedData.image = req.file.path;
+      updatedData.image = resolveUploadedImageUrl(req.file);
     }
 
     const updatedOpportunity = await Opportunity.findByIdAndUpdate(
