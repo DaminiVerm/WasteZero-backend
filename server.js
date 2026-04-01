@@ -53,7 +53,7 @@ app.get("/api/test", (req, res) => {
 if (!process.env.VERCEL) {
   const io = new Server(server, {
     cors: {
-      origin: ["https://wastezero-smart-waste-platform-frontend.onrender.com"],
+      origin: ["https://waste-zero-frontend.vercel.app/"],
       methods: ["GET", "POST"],
     },
   });
@@ -84,7 +84,7 @@ if (!process.env.VERCEL) {
     });
   });
 
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 3003;
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
