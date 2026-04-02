@@ -220,6 +220,21 @@ export const getActivityLogs = async (req, res) => {
   }
 };
 
+export const deleteActivityLog = async (req, res) => {
+  try {
+    const log = await ActivityLog.findById(req.params.id);
+    if (!log) {
+      return res.status(404).json({ message: "Activity log not found" });
+    }
+
+    await log.deleteOne();
+
+    res.json({ success: true, message: "Activity log deleted" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 
 

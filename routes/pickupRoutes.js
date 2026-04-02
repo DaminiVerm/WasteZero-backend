@@ -219,6 +219,24 @@ router.put(
       });
       emitNotificationToUser(pickup.volunteer);
 
+      const admins = await User.find({
+        role: "admin",
+        _id: { $ne: req.user._id },
+      }).select("_id");
+
+      if (admins.length > 0) {
+        const adminNotifications = admins.map((admin) => ({
+          recipient: admin._id,
+          sender: req.user._id,
+          type: "pickup_status",
+          content: `${req.user.name} marked a pickup in ${pickup.city} as completed.`,
+          link: "/dashboard",
+        }));
+
+        await Notification.insertMany(adminNotifications);
+        admins.forEach((admin) => emitNotificationToUser(admin._id));
+      }
+
       res.status(200).json(pickup);
     } catch (error) {
       console.error("Error completing pickup:", error);

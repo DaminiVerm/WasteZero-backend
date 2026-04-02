@@ -373,29 +373,45 @@ export const createOpportunity = async (req, res) => {
     });
 
     const volunteers = await User.find({ role: "volunteer", isSuspended: false }).select("_id name skills location locationCoords");
+    const admins = await User.find({
+      role: "admin",
+      _id: { $ne: req.user._id },
+      isSuspended: { $ne: true },
+    }).select("_id");
 
-    if (volunteers.length > 0) {
-      const matchedVolunteers = [];
+    const opportunityNotifications = [];
+    const recipientsToEmit = new Set();
 
-      for (const volunteer of volunteers) {
-        const match = await scoreOpportunityForVolunteer(volunteer, newOpportunity);
-        if (match.isMatch && match.score >= 60) {
-          matchedVolunteers.push(volunteer);
-        }
-      }
+    for (const volunteer of volunteers) {
+      const match = await scoreOpportunityForVolunteer(volunteer, newOpportunity);
+      const isMatched = match.isMatch && match.score >= 60;
 
-      const volunteerNotifications = matchedVolunteers.map((volunteer) => ({
+      opportunityNotifications.push({
         recipient: volunteer._id,
         sender: req.user._id,
         type: "opportunity_status",
-        content: `New opportunity match: "${newOpportunity.title}" fits your waste interests and location.`,
+        content: isMatched
+          ? `New opportunity match: "${newOpportunity.title}" fits your waste interests and location.`
+          : `${req.user.name} posted a new opportunity: "${newOpportunity.title}".`,
         link: "/opportunities",
-      }));
+      });
+      recipientsToEmit.add(volunteer._id.toString());
+    }
 
-      if (volunteerNotifications.length > 0) {
-        await Notification.insertMany(volunteerNotifications);
-        matchedVolunteers.forEach((volunteer) => emitNotificationToUser(volunteer._id));
-      }
+    admins.forEach((admin) => {
+      opportunityNotifications.push({
+        recipient: admin._id,
+        sender: req.user._id,
+        type: "opportunity_status",
+        content: `${req.user.name} posted a new opportunity: "${newOpportunity.title}".`,
+        link: "/dashboard",
+      });
+      recipientsToEmit.add(admin._id.toString());
+    });
+
+    if (opportunityNotifications.length > 0) {
+      await Notification.insertMany(opportunityNotifications);
+      recipientsToEmit.forEach((recipientId) => emitNotificationToUser(recipientId));
     }
 
     res.status(201).json({ success: true, opportunity: newOpportunity });
@@ -485,6 +501,10 @@ export const getDashboardData = async (req, res) => {
 
       const ngoOpportunities = getApplicationOpportunities(ngoOpportunitiesRaw);
       const allNgoOpportunities = ngoOpportunitiesRaw.map(normalizeOpportunityApplicants);
+      const totalVolunteers = await User.countDocuments({
+        role: "volunteer",
+        isSuspended: false,
+      });
 
       const ngoPickups = await Pickup.find({
         $or: [
@@ -523,7 +543,8 @@ export const getDashboardData = async (req, res) => {
       return res.json({
         stats: {
           ...derivedStats,
-          activeOpportunities,
+          activeOpportunities: activeOpportunities || allNgoOpportunities.filter((opportunity) => opportunity.status === "Open").length,
+          totalVolunteers,
           completedPickups,
           pendingPickups,
         },
