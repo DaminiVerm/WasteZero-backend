@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
+import mongoose from "mongoose";
 import opportunityRoutes from "./routes/opportunityRoutes.js";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -22,7 +23,7 @@ import {
 } from "./utils/socket.js";
 
 dotenv.config();
-connectDB();
+await connectDB();
 
 const app = express();
 
@@ -37,7 +38,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/auth", userRoutes); // auth routes: /login, /register, /verify-otp
-app.use("/api/users", userRoutes);
+app.use("/api/users", userRoutes); // user/profile routes consumed by the frontend
 app.use("/api/opportunity", opportunityRoutes);
 app.use("/api/pickups", pickupRoutes);
 app.use("/api/messages", messageRoutes);
@@ -47,13 +48,24 @@ app.use("/api/admin", adminRoutes);
 app.get("/api/test", (req, res) => {
   res.send("Backend is working!");
 });
+app.get("/api/debug-db", (req, res) => {
+  const mongoUri = process.env.MONGO_URI || "";
+
+  res.json({
+    hasMongoUri: Boolean(mongoUri),
+    mongoReadyState: mongoose.connection.readyState,
+    mongoHostPreview: mongoUri
+      ? mongoUri.replace(/\/\/([^:]+):([^@]+)@/, "//$1:***@")
+      : null,
+  });
+});
 
 // Vercel serverless functions should export the Express app directly.
 // Socket.io is only initialized for local long-running Node servers.
 if (!process.env.VERCEL) {
   const io = new Server(server, {
     cors: {
-      origin: ["https://waste-zero-frontend.vercel.app/"],
+      origin: ["https://wastezero-smart-waste-platform-frontend.onrender.com"],
       methods: ["GET", "POST"],
     },
   });
@@ -84,7 +96,7 @@ if (!process.env.VERCEL) {
     });
   });
 
-  const PORT = process.env.PORT || 3003;
+  const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

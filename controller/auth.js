@@ -153,15 +153,23 @@ export const loginUser = async (req, res) => {
       return;
     }
 
-    const { email, password } = req.body;
+    const { email, username, identifier, password } = req.body;
+    const normalizedIdentifier = (identifier || email || username || "").trim();
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+    if (!normalizedIdentifier || !password) {
+      return res.status(400).json({ message: "Email or username and password are required" });
     }
 
     const user = isDbConnected()
-      ? await User.findOne({ email })
-      : mockUsers.find(u => u.email === email);
+      ? await User.findOne({
+          $or: [
+            { email: normalizedIdentifier },
+            { username: normalizedIdentifier },
+          ],
+        })
+      : mockUsers.find(
+          (u) => u.email === normalizedIdentifier || u.username === normalizedIdentifier
+        );
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
@@ -191,14 +199,15 @@ export const loginUser = async (req, res) => {
     }
     
     try {
-      await sendEmail(email, otp);
+      await sendEmail(user.email, otp);
     } catch (e) {
       console.log("Login OTP mail failed, but continuing with OTP:", otp);
     }
 
     res.status(200).json({
       message: "OTP sent to your email. (OTP: " + otp + ")",
-      userId: user._id
+      userId: user._id,
+      deliveryEmail: user.email,
     });
 
   } catch (error) {
